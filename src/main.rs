@@ -18,6 +18,9 @@ use serenity::{
     model::channel::Message,
 };
 
+// Error handling the way God intended.
+type Result<T> = std::result::Result<T, Box<error::Error>>;
+
 // The maximum number of characters allowed in a Discord message.
 // Updated: October 28, 2018
 const DISCORD_MAX_MSG_CHAR_LEN: usize = 2000;
@@ -27,7 +30,7 @@ struct DiscordBot {
 }
 
 impl DiscordBot {
-    pub fn new() -> Result<DiscordBot, Box<error::Error>> {
+    pub fn new() -> Result<DiscordBot> {
         let id: u64 = env::var("DISCORD_ID")
                         .expect("set DISCORD_ID")
                         .parse()?;
@@ -39,7 +42,7 @@ impl DiscordBot {
     }
 
     // TODO: Impl Write?
-    pub fn write(&self, msg: &str) -> Result<Option<Message>, Box<error::Error>> {
+    pub fn write(&self, msg: &str) -> Result<Option<Message>> {
 
         let mut msg = msg;
         // Discord has a maximum message size.
@@ -60,17 +63,14 @@ impl DiscordBot {
     }
 
     // TODO: Impl Write?
-    pub fn writef(&self, args: fmt::Arguments) -> Result<Option<Message>, Box<error::Error>> {
+    pub fn writef(&self, args: fmt::Arguments) -> Result<Option<Message>> {
         let utf8 = format!("{}", args);
         self.write(&utf8)
     }
 }
 
 /// Helper method to perform a GET request and parse the result into Json.
-pub fn get_json(client: &mut reqwest::Client,
-                url:    Url)
-    -> Result<JsonValue, Box<error::Error>>
-{
+pub fn get_json(client: &mut reqwest::Client, url: Url) -> Result<JsonValue> {
     let req = client.get(url).build()?;
     // This should always be a GET request.
     println!("{} \"{}\"", req.method(), req.url());
@@ -85,7 +85,7 @@ pub fn get_json(client: &mut reqwest::Client,
 }
 
 fn get_everything(client: &mut reqwest::Client, symbol: &str)
-    -> Result<JsonValue, Box<error::Error>>
+    -> Result<JsonValue>
 {
     // This is our final Json object returned. It will contain *everything* we
     // can find on this symbol.
@@ -130,7 +130,7 @@ fn main() {
     }
 }
 
-fn main2() ->  Result<(), Box<error::Error>> {
+fn main2() ->  Result<()> {
     let bot = DiscordBot::new()?;
     bot.write("✓ - Hello!")?;
 
