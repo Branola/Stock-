@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Chris Butler <chrisbutler296@gmail.com>"]
 edition = "2018"
 
+[dependencies]
+curl = '^0.4'
+
 [dependencies.serenity]
 default-features = true
 version = "^0.5"
