@@ -174,8 +174,9 @@ fn main2() ->  Result<()> {
     let mut state = PersistantState::new()?;
     state.bot.write("✓ - Hello!")?;
 
-    let delay = time::Duration::from_secs(10);
+    let delay = time::Duration::from_secs(5*60);
     loop {
+        println!("{:?}", time::SystemTime::now());
         match query_stock(&mut state) {
             Ok(()) => {},
             Err(err) => {
@@ -183,8 +184,7 @@ fn main2() ->  Result<()> {
                 state.bot.write("✗ - Error in processing update.")?;
             }
         }
+        println!("");
         thread::sleep(delay);
     }
-
-    Ok(())
 }
