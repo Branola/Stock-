@@ -5,8 +5,10 @@ authors = ["Chris Butler <chrisbutler296@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-curl = '^0.4'
-json = '^0.11'
+reqwest = "^0.8"
+serde = "^1.0"
+serde_derive = "^1.0"
+serde_json = "^1.0"
 
 [dependencies.serenity]
 default-features = true
