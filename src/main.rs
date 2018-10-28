@@ -3,6 +3,8 @@ use std::{
     error,
     fmt,
     str,
+    thread,
+    time,
 };
 
 use reqwest::{
@@ -25,6 +27,26 @@ type Result<T> = std::result::Result<T, Box<error::Error>>;
 // Updated: October 28, 2018
 const DISCORD_MAX_MSG_CHAR_LEN: usize = 2000;
 
+#[derive(Debug)]
+struct PersistantState {
+    symbol: String,
+    bot:    DiscordBot,
+    client: Client,
+    calls:  u64,
+}
+
+impl PersistantState {
+    fn new() -> Result<PersistantState> {
+        Ok(PersistantState {
+            symbol: env::var("STOCK_SYMBOL").expect("set STOCK_SYMBOL"),
+            bot:    DiscordBot::new()?,
+            client: Client::new(),
+            calls:  0,
+        })
+    }
+}
+
+#[derive(Debug)]
 struct DiscordBot {
     webhook: Webhook,
 }
@@ -106,21 +128,39 @@ fn get_everything(client: &mut reqwest::Client, symbol: &str)
     j["instruments"] = get_json(client, Url::parse(&url)?)?;
     j["instruments"].remove("description"); // Too long to care.
 
-    let id: String = j["instruments"]["id"].as_str()
-                                           .unwrap_or_default().to_string();
-
     // "Quote" is information about the price of stock
-    let instr = &j["instruments"]["quote"];
-    let url: &str = instr.as_str().unwrap_or_default();
+    let quote = &j["instruments"]["quote"];
+    let url: &str = quote.as_str().unwrap_or_default();
     j["quote"] = get_json(client, Url::parse(&url)?)?;
+    j["quote"].remove("instrument"); // We already have this URL.
 
     // "Market" is information about the stock exchange in question.
     // e.g. It's NASDAQ for AMD.
-    let instr = &j["instruments"]["market"];
-    let url: &str = instr.as_str().unwrap_or_default();
+    let market = &j["instruments"]["market"];
+    let url: &str = market.as_str().unwrap_or_default();
     j["market"] = get_json(client, Url::parse(&url)?)?;
 
     Ok(j)
+}
+
+fn query_stock(state: &mut PersistantState) -> Result<()> {
+    let amd_json = get_everything(&mut state.client, &state.symbol)?;
+    state.calls += 1;
+
+    // Dump a human-readable version of the json.
+    let mut pretty_buffer: Vec<u8> = vec![];
+    amd_json["quote"].write_pretty(&mut pretty_buffer, 4 /*spaces*/)?;
+
+    let pretty_utf8: &str = str::from_utf8(&pretty_buffer)?;
+
+    // And post it to chat - ignoring errors (probably about length)
+    let _ = state.bot.writef(format_args!(
+            "```\n{}\n```\n",
+            pretty_utf8));
+
+    // Save interesting values
+    // Print interesting changes
+    Ok(())
 }
 
 fn main() {
@@ -131,23 +171,20 @@ fn main() {
 }
 
 fn main2() ->  Result<()> {
-    let bot = DiscordBot::new()?;
-    bot.write("✓ - Hello!")?;
+    let mut state = PersistantState::new()?;
+    state.bot.write("✓ - Hello!")?;
 
-    let mut client = Client::new();
-    let amd_json = get_everything(&mut client, "AMD")?;
-
-    // Dump a human-readable version of the json.
-    let pretty_utf8: &str;
-    let mut pretty_buffer: Vec<u8> = vec![];
-    amd_json.write_pretty(&mut pretty_buffer, 4 /*spaces*/)?;
-    pretty_utf8 = str::from_utf8(&pretty_buffer)?;
-
-    // And post it to chat - ignoring errors (probably about length)
-    bot.writef(format_args!("AMD Json:\n```\n{}\n```\n", pretty_utf8));
-
-    // Save interesting values
-    // Print interesting changes
+    let delay = time::Duration::from_secs(10);
+    loop {
+        match query_stock(&mut state) {
+            Ok(()) => {},
+            Err(err) => {
+                eprintln!("ERROR: {:?}", err);
+                state.bot.write("✗ - Error in processing update.")?;
+            }
+        }
+        thread::sleep(delay);
+    }
 
     Ok(())
 }
