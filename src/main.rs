@@ -10,13 +10,13 @@ use reqwest::{
     Url,
 };
 
+use json::JsonValue;
+
 use serenity::{
     http,
     model::webhook::Webhook,
     model::channel::Message,
 };
-
-mod robinhood;
 
 // The maximum number of characters allowed in a Discord message.
 // Updated: October 28, 2018
@@ -66,33 +66,61 @@ impl DiscordBot {
     }
 }
 
-/// Get the id that Robinhood uses to track a symbol.
-///
-/// This id is needed for some of the API endpoints. If you don't need a full
-/// `StockInfo` struct, this is lighter weight than populating that.
-/// e.g. For `AMD`, the id is `940fc3f5-1db5-4fed-b452-f3a2e4562b5f`.
-fn get_robinhood_id(client: &mut Client,
-                    symbol: &str)
-    -> Result<String, Box<error::Error>>
+/// Helper method to perform a GET request and parse the result into Json.
+pub fn get_json(client: &mut reqwest::Client,
+                url:    Url)
+    -> Result<JsonValue, Box<error::Error>>
 {
-    // We'll scrape the id from the "instrument" URL in this response.
-    // If the API changes, this will start to fail.
-    let info = robinhood::Fundamentals::load(client, symbol)?;
-    // The path segments are expected to look like this:
-    //      [ "instruments", "940fc3f5-1db5-4fed-b452-f3a2e4562b5f", ""]
-    // If we don't get back a valid URL, or they don't look like this,
-    // there's not much we can do.
-    if let Some(mut segments) = Url::parse(&info.instrument)?
-                                    .path_segments() {
-        if let Some(id) = segments.nth(1) {
-            return Ok(id.to_string());
-        } else {
-            eprintln!("ERROR: Malformed URL - Not enough path segments. Did Robinhood change their API?");
-        }
+    let req = client.get(url).build()?;
+    // This should always be a GET request.
+    println!("{} \"{}\"", req.method(), req.url());
+
+    let mut res = client.execute(req)?;
+    if res.status() == reqwest::StatusCode::Ok {
+        Ok(json::parse(&res.text()?)?)
     } else {
-        eprintln!("ERROR: Malformed URL - This isn't a valid URL. How did you get here?");
+        eprintln!("Request failed with status code: {:?}", res.status());
+        panic!("Couldn't make a reqwest Error object - API doesn't allow it.");
     }
-    Ok("ffffffff-ffff-ffff-ffff-ffffffffffff".to_string())
+}
+
+fn get_everything(client: &mut reqwest::Client, symbol: &str)
+    -> Result<JsonValue, Box<error::Error>>
+{
+    // This is our final Json object returned. It will contain *everything* we
+    // can find on this symbol.
+    // It's used so much, it helps to have a short name like "j", for Json.
+    let mut j = json::JsonValue::new_object();
+
+    // The "first" end-point is "Fundamentals", and is looked up by symbol.
+    let url = format!("https://api.robinhood.com/fundamentals/{}/", symbol);
+    j["fundamentals"] = get_json(client, Url::parse(&url)?)?;
+    j["fundamentals"].remove("description"); // Too long to care.
+
+    // The next endpoint that we check is "Instrument".
+    // This is a natural follow-up, since we get the direct URL from
+    // Fundamentals. This is also valuable for the "id" field, which gets us
+    // the internal Robinhood Id, without having to parse a URL.
+    let instr = &j["fundamentals"]["instrument"];
+    let url: &str = instr.as_str().unwrap_or_default();
+    j["instruments"] = get_json(client, Url::parse(&url)?)?;
+    j["instruments"].remove("description"); // Too long to care.
+
+    let id: String = j["instruments"]["id"].as_str()
+                                           .unwrap_or_default().to_string();
+
+    // "Quote" is information about the price of stock
+    let instr = &j["instruments"]["quote"];
+    let url: &str = instr.as_str().unwrap_or_default();
+    j["quote"] = get_json(client, Url::parse(&url)?)?;
+
+    // "Market" is information about the stock exchange in question.
+    // e.g. It's NASDAQ for AMD.
+    let instr = &j["instruments"]["market"];
+    let url: &str = instr.as_str().unwrap_or_default();
+    j["market"] = get_json(client, Url::parse(&url)?)?;
+
+    Ok(j)
 }
 
 fn main() {
@@ -103,16 +131,23 @@ fn main() {
 }
 
 fn main2() ->  Result<(), Box<error::Error>> {
-    let mut client = Client::new();
-
     let bot = DiscordBot::new()?;
     bot.write("✓ - Hello!")?;
 
-    let amd_id = get_robinhood_id(&mut client, "AMD")?;
-    println!("AMD's Robinhood's Id = `{}`", amd_id);
+    let mut client = Client::new();
+    let amd_json = get_everything(&mut client, "AMD")?;
 
-    let amd_funda = robinhood::Fundamentals::load(&mut client, "AMD")?;
-    bot.writef(format_args!("AMD Fundamentals:\n```\n{:#?}\n```", amd_funda))?;
+    // Dump a human-readable version of the json.
+    let pretty_utf8: &str;
+    let mut pretty_buffer: Vec<u8> = vec![];
+    amd_json.write_pretty(&mut pretty_buffer, 4 /*spaces*/)?;
+    pretty_utf8 = str::from_utf8(&pretty_buffer)?;
+
+    // And post it to chat - ignoring errors (probably about length)
+    bot.writef(format_args!("AMD Json:\n```\n{}\n```\n", pretty_utf8));
+
+    // Save interesting values
+    // Print interesting changes
 
     Ok(())
 }

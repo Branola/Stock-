@@ -1,0 +1,81 @@
+// GET "https://api.robinhood.com/fundamentals/AMD/"
+// GET "https://api.robinhood.com/instruments/940fc3f5-1db5-4fed-b452-f3a2e4562b5f/"
+// GET "https://api.robinhood.com/quotes/AMD/"
+// GET "https://api.robinhood.com/markets/XNAS/"
+{
+    "fundamentals": {
+        "open": "18.490000",
+        "high": "18.770000",
+        "low": "17.250000",
+        "volume": "56573765.000000",
+        "average_volume_2_weeks": "112203294.200000",
+        "average_volume": "75154888.127500",
+        "high_52_weeks": "34.140000",
+        "dividend_yield": "0.000000",
+        "low_52_weeks": "9.040000",
+        "market_cap": "17189250000.000000",
+        "pe_ratio": "51.131090",
+        "shares_outstanding": "975000000.000000",
+        "instrument": "https://api.robinhood.com/instruments/940fc3f5-1db5-4fed-b452-f3a2e4562b5f/",
+        "ceo": "Lisa T. Su",
+        "headquarters_city": "Santa Clara",
+        "headquarters_state": "California",
+        "sector": "Electronic Technology",
+        "industry": "Semiconductors",
+        "num_employees": 8900,
+        "year_founded": 1969
+    },
+    "instruments": {
+        "margin_initial_ratio": "0.5000",
+        "rhs_tradability": "tradable",
+        "id": "940fc3f5-1db5-4fed-b452-f3a2e4562b5f",
+        "market": "https://api.robinhood.com/markets/XNAS/",
+        "simple_name": "AMD",
+        "min_tick_size": null,
+        "maintenance_ratio": "0.2500",
+        "tradability": "tradable",
+        "state": "active",
+        "type": "stock",
+        "tradeable": true,
+        "fundamentals": "https://api.robinhood.com/fundamentals/AMD/",
+        "quote": "https://api.robinhood.com/quotes/AMD/",
+        "symbol": "AMD",
+        "day_trade_ratio": "0.2500",
+        "name": "Advanced Micro Devices, Inc. Common Stock",
+        "tradable_chain_id": "e66ce029-db96-4572-87a0-b144613c08bf",
+        "splits": "https://api.robinhood.com/instruments/940fc3f5-1db5-4fed-b452-f3a2e4562b5f/splits/",
+        "url": "https://api.robinhood.com/instruments/940fc3f5-1db5-4fed-b452-f3a2e4562b5f/",
+        "country": "US",
+        "bloomberg_unique": "EQ0010001000001000",
+        "list_date": "1990-01-02"
+    },
+    "quote": {
+        "ask_price": "17.630000",
+        "ask_size": 3100,
+        "bid_price": "17.620000",
+        "bid_size": 2600,
+        "last_trade_price": "17.630000",
+        "last_extended_hours_trade_price": "17.959900",
+        "previous_close": "19.270000",
+        "adjusted_previous_close": "19.270000",
+        "previous_close_date": "2018-10-25",
+        "symbol": "AMD",
+        "trading_halted": false,
+        "has_traded": true,
+        "last_trade_price_source": "consolidated",
+        "updated_at": "2018-10-26T23:59:36Z",
+        "instrument": "https://api.robinhood.com/instruments/940fc3f5-1db5-4fed-b452-f3a2e4562b5f/"
+    },
+    "market": {
+        "website": "www.nasdaq.com",
+        "city": "New York",
+        "name": "NASDAQ - All Markets",
+        "url": "https://api.robinhood.com/markets/XNAS/",
+        "country": "United States of America",
+        "todays_hours": "https://api.robinhood.com/markets/XNAS/hours/2018-10-28/",
+        "operating_mic": "XNAS",
+        "acronym": "NASDAQ",
+        "timezone": "US/Eastern",
+        "mic": "XNAS"
+    }
+}
