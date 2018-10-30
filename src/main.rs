@@ -33,6 +33,9 @@ struct PersistantState {
     bot:    DiscordBot,
     client: Client,
     calls:  u64,
+
+    // The last known price, in cents.
+    last_price: u64,
 }
 
 impl PersistantState {
@@ -42,6 +45,7 @@ impl PersistantState {
             bot:    DiscordBot::new()?,
             client: Client::new(),
             calls:  0,
+            last_price: 0,
         })
     }
 }
@@ -146,20 +150,42 @@ fn get_everything(client: &mut reqwest::Client, symbol: &str)
 fn query_stock(state: &mut PersistantState) -> Result<()> {
     let amd_json = get_everything(&mut state.client, &state.symbol)?;
     state.calls += 1;
+    let usd_price = amd_json["quote"]["last_trade_price"]
+        .as_str().ok_or("quote/last_trade_price not found")?
+        .parse::<f64>()?;
+
+    let last_price = state.last_price;
+    state.last_price = (usd_price.round() * 100.0) as u64;
+
+    #[derive(Debug)]
+    struct StatusUpdate {
+        total_calls: u64,
+        last_price: f64,
+    }
+    println!("{:?}", StatusUpdate {
+        total_calls: state.calls,
+        last_price: state.last_price as f64 / 100.0
+    });
 
     // Dump a human-readable version of the json.
     let mut pretty_buffer: Vec<u8> = vec![];
     amd_json["quote"].write_pretty(&mut pretty_buffer, 4 /*spaces*/)?;
+    let _pretty_utf8: &str = str::from_utf8(&pretty_buffer)?;
+    // println!("{}", pretty_utf8);
 
-    let pretty_utf8: &str = str::from_utf8(&pretty_buffer)?;
+    let diff = (state.last_price / 100) as i64 - (last_price / 100) as i64;
+    if diff < 0 {
+        // And post it to chat - ignoring errors (probably about length)
+        let _ = state.bot.writef(format_args!(
+                "AMD price is DOWN to ${:4.2}\n", usd_price));
+    } else if diff > 0 {
+        // And post it to chat - ignoring errors (probably about length)
+        let _ = state.bot.writef(format_args!(
+                "AMD price is UP to ${:4.2}\n", usd_price));
+    } else {
+        // No messages if there are no changes over a dollar line.
+    }
 
-    // And post it to chat - ignoring errors (probably about length)
-    let _ = state.bot.writef(format_args!(
-            "```\n{}\n```\n",
-            pretty_utf8));
-
-    // Save interesting values
-    // Print interesting changes
     Ok(())
 }
 
@@ -171,12 +197,12 @@ fn main() {
 }
 
 fn main2() ->  Result<()> {
+    let delay = time::Duration::from_secs(5*60);
+
     let mut state = PersistantState::new()?;
     state.bot.write("✓ - Hello!")?;
 
-    let delay = time::Duration::from_secs(5*60);
     loop {
-        println!("{:?}", time::SystemTime::now());
         match query_stock(&mut state) {
             Ok(()) => {},
             Err(err) => {
