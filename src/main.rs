@@ -48,6 +48,11 @@ impl PersistantState {
             last_price: 0,
         })
     }
+
+    // Returns "self.last_price", as a float in USD, e.g. 2.00.
+    fn last_price_usd(&self) -> f64 {
+        self.last_price as f64 / 100.0
+    }
 }
 
 #[derive(Debug)]
@@ -149,22 +154,23 @@ fn get_everything(client: &mut reqwest::Client, symbol: &str)
 
 fn query_stock(state: &mut PersistantState) -> Result<()> {
     let amd_json = get_everything(&mut state.client, &state.symbol)?;
+
     state.calls += 1;
-    let usd_price = amd_json["quote"]["last_trade_price"]
-        .as_str().ok_or("quote/last_trade_price not found")?
+    let price_usd = amd_json["quote"]["last_trade_price"]
+        .as_str().ok_or("\"quote/last_trade_price\" not found")?
         .parse::<f64>()?;
 
-    let last_price = state.last_price;
-    state.last_price = (usd_price.round() * 100.0) as u64;
+    let last_price_usd = state.last_price_usd();
+    state.last_price = (price_usd * 100.0).round() as u64;
 
     #[derive(Debug)]
     struct StatusUpdate {
         total_calls: u64,
-        last_price: f64,
+        last_price_usd: f64,
     }
     println!("{:?}", StatusUpdate {
         total_calls: state.calls,
-        last_price: state.last_price as f64 / 100.0
+        last_price_usd: state.last_price_usd(),
     });
 
     // Dump a human-readable version of the json.
@@ -173,15 +179,20 @@ fn query_stock(state: &mut PersistantState) -> Result<()> {
     let _pretty_utf8: &str = str::from_utf8(&pretty_buffer)?;
     // println!("{}", pretty_utf8);
 
-    let diff = (state.last_price / 100) as i64 - (last_price / 100) as i64;
+    // We need to know whether we should alter the chat.
+    // We only alert the chat if the price has crossed a dollar boundary.
+    // e.g. 17.01 -> 17.99 => No alert
+    //      17.99 -> 18.01 => Alert
+    let diff = state.last_price_usd().round() as i64
+               - last_price_usd       .round() as i64;
     if diff < 0 {
         // And post it to chat - ignoring errors (probably about length)
         let _ = state.bot.writef(format_args!(
-                "AMD price is DOWN to ${:4.2}\n", usd_price));
+                "AMD price is DOWN to ${:4.2}\n", price_usd));
     } else if diff > 0 {
         // And post it to chat - ignoring errors (probably about length)
         let _ = state.bot.writef(format_args!(
-                "AMD price is UP to ${:4.2}\n", usd_price));
+                "AMD price is UP to ${:4.2}\n", price_usd));
     } else {
         // No messages if there are no changes over a dollar line.
     }
