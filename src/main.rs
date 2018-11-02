@@ -208,10 +208,11 @@ fn main() {
 }
 
 fn main2() ->  Result<()> {
-    let delay = time::Duration::from_secs(5*60);
+    let delay = time::Duration::from_secs(1*60);
 
     let mut state = PersistantState::new()?;
     state.bot.write("✓ - Hello!")?;
+    println!("✓ - Hello!");
 
     loop {
         match query_stock(&mut state) {
